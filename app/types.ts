@@ -9,11 +9,17 @@ export type WriteFileToolArgs = {
   content: string;
 };
 
+export type BashToolArgs = {
+  command: string;
+};
+
 export type ToolCallResult = {
   role: "tool";
   tool_call_id: string;
   content: string;
 };
+
+
 
 export type UserMessage = { role: "user"; content: string };
 export type AssistantMessage = {

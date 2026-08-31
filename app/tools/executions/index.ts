@@ -1,6 +1,7 @@
 import type { ChatCompletionMessageToolCall } from "openai/resources";
 import type { ToolCallResult } from "../../types";
 import { executeReadFileTool, executeWriteFileTool } from "./file-system";
+import { executeBashTool } from "./command-line";
 
 export const executeToolCall = async (
   toolCall: ChatCompletionMessageToolCall,
@@ -15,6 +16,8 @@ export const executeToolCall = async (
      return  executeReadFileTool(toolCall);
     case "write":
      return  executeWriteFileTool(toolCall);
+    case "bash":
+     return  executeBashTool(toolCall);
     default:
       console.error("Invalid tool call name:", toolName)
   }
