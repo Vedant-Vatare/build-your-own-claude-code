@@ -1,16 +1,16 @@
 import OpenAI from "openai";
-import type {  ResponseMessages } from "./types";
+import type { ResponseMessages } from "./types";
 import { chatCompletionTools } from "./tools/definitions";
 import { executeToolCall } from "./tools/executions";
 
 async function main() {
   const [, , flag, prompt] = process.argv;
   const apiKey = process.env.OPENROUTER_API_KEY;
-  const model =process.env.MODEL;
+  const model = process.env.MODEL;
   const baseURL =
     process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1";
 
-  if (!apiKey || !model) {
+  if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY or LLM model is not set");
   }
   if (flag !== "-p" || !prompt) {
@@ -25,7 +25,7 @@ async function main() {
 
   while (true) {
     const response = await client.chat.completions.create({
-      model: model,
+      model: "anthropic/claude-haiku-4.5",
       messages: messages,
       tools: chatCompletionTools,
     });
@@ -54,6 +54,5 @@ async function main() {
     }
   }
 }
-
 
 main();

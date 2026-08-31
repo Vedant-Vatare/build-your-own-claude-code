@@ -1,6 +1,6 @@
 import type { ChatCompletionMessageToolCall } from "openai/resources";
 import type { ToolCallResult } from "../../types";
-import { executeReadFileTool } from "./file-system";
+import { executeReadFileTool, executeWriteFileTool } from "./file-system";
 
 export const executeToolCall = async (
   toolCall: ChatCompletionMessageToolCall,
@@ -9,8 +9,15 @@ export const executeToolCall = async (
     console.error(toolCall);
     throw new Error("not a valid tool call");
   }
-  if (toolCall.function.name.toLowerCase() === "read") {
-    executeReadFileTool(toolCall);
+  const toolName = toolCall.function.name.toLowerCase()
+  switch (toolName) {
+    case "read":
+     return  executeReadFileTool(toolCall);
+    case "write":
+     return  executeWriteFileTool(toolCall);
+    default:
+      console.error("Invalid tool call name:", toolName)
   }
+
   return undefined;
 };

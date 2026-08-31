@@ -4,6 +4,11 @@ export type ReadToolArgs = {
   file_path: string;
 };
 
+export type WriteFileToolArgs = {
+  file_path: string;
+  content: string;
+};
+
 export type ToolCallResult = {
   role: "tool";
   tool_call_id: string;
