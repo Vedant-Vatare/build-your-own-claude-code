@@ -22,8 +22,8 @@ async function main() {
     baseURL: baseURL,
   });
   const messages: ResponseMessages = [{ role: "user", content: prompt }];
-  let steps = 0;
-  while (steps <= 10) {
+  
+  while (true) {
     const response = await client.chat.completions.create({
       model: "anthropic/claude-haiku-4.5",
       messages: messages,
@@ -56,7 +56,6 @@ async function main() {
 
     if (!response.choices || response.choices.length === 0) {
       throw new Error("no choices in response");
-      break;
     }
     const toolCalls = response.choices[0].message.tool_calls || [];
 
@@ -71,7 +70,6 @@ async function main() {
       console.log(messages[messages.length - 1].content);
       break;
     }
-    steps++;
   }
 }
 
