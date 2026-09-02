@@ -1,14 +1,12 @@
 import OpenAI from "openai";
-import type { ResponseMessages } from "./types";
+import { sessionMessages } from "./main";
 import { chatCompletionTools } from "./tools/definitions";
 import { executeToolCall } from "./tools/executions";
-import { sessionMessages } from "./main";
 
 export const agent = async (prompt: string) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const model = process.env.MODEL;
-  const baseURL =
-    process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1";
+  const baseURL = process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1";
 
   if (!apiKey || !model) {
     throw new Error("OPENROUTER_API_KEY or LLM model is not set");
@@ -22,8 +20,8 @@ export const agent = async (prompt: string) => {
     baseURL: baseURL,
   });
 
-  sessionMessages.push({role: "user", content: prompt})
-  
+  sessionMessages.push({ role: "user", content: prompt });
+
   while (true) {
     const response = await client.chat.completions.create({
       model: model,
@@ -42,12 +40,25 @@ export const agent = async (prompt: string) => {
     }
     const toolCalls = response.choices[0].message.tool_calls || [];
 
-    for (const toolCall of toolCalls) {
-      const toolCallResult = await executeToolCall(toolCall);
-      if (toolCallResult) {
-        sessionMessages.push(toolCallResult);
+    const toolCallResults = await Promise.allSettled(
+      toolCalls.map((toolcall) => executeToolCall(toolcall)),
+    );
+
+    toolCallResults.forEach((toolCallResult, index) => {
+      if (toolCallResult.status === "fulfilled") {
+        sessionMessages.push(toolCallResult.value);
+      } else {
+        const errorMessage =
+          toolCallResult.reason instanceof Error
+            ? `${toolCallResult.reason.name}: ${toolCallResult.reason.message}`
+            : "Error executing tool";
+        sessionMessages.push({
+          role: "tool",
+          tool_call_id: toolCalls[index].id,
+          content: errorMessage,
+        });
       }
-    }
+    });
 
     if (response.choices[0].finish_reason === "stop") {
       console.log(sessionMessages[sessionMessages.length - 1].content);
