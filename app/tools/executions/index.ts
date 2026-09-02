@@ -1,26 +1,28 @@
 import type { ChatCompletionMessageToolCall } from "openai/resources";
 import type { ToolCallResult } from "../../types";
-import { executeReadFileTool, executeWriteFileTool } from "./file-system";
 import { executeBashTool } from "./command-line";
+import { executeReadFileTool, executeWriteFileTool } from "./file-system";
 
 export const executeToolCall = async (
   toolCall: ChatCompletionMessageToolCall,
-): Promise<ToolCallResult | undefined> => {
+): Promise<ToolCallResult> => {
   if (toolCall.type !== "function") {
-    console.error(toolCall);
     throw new Error("not a valid tool call");
   }
-  const toolName = toolCall.function.name.toLowerCase()
+
+  const toolName = toolCall.function.name.toLowerCase();
   switch (toolName) {
     case "read":
-     return  executeReadFileTool(toolCall);
+      return executeReadFileTool(toolCall);
     case "write":
-     return  executeWriteFileTool(toolCall);
+      return executeWriteFileTool(toolCall);
     case "bash":
-     return  executeBashTool(toolCall);
+      return executeBashTool(toolCall);
     default:
-      console.error("Invalid tool call name:", toolName)
   }
-
-  return undefined;
+  return {
+    role: "tool",
+    tool_call_id: toolCall.id,
+    content: `invalid tool call name ${toolName}`,
+  };
 };
