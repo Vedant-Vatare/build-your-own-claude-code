@@ -13,13 +13,20 @@ export type BashToolArgs = {
   command: string;
 };
 
+export type EditFileToolArgs = {
+  changes: {
+    file_path: string;
+    old_string: string;
+    new_string: string;
+    replace_all?: boolean;
+  }[];
+};
+
 export type ToolCallResult = {
   role: "tool";
   tool_call_id: string;
   content: string;
 };
-
-
 
 export type UserMessage = { role: "user"; content: string };
 export type AssistantMessage = {

@@ -1,7 +1,7 @@
 import type { ChatCompletionMessageToolCall } from "openai/resources";
 import type { ToolCallResult } from "../../types";
 import { executeBashTool } from "./command-line";
-import { executeReadFileTool, executeWriteFileTool } from "./file-system";
+import { executeEditFileTool, executeReadFileTool, executeWriteFileTool } from "./file-system";
 
 export const executeToolCall = async (
   toolCall: ChatCompletionMessageToolCall,
@@ -16,6 +16,8 @@ export const executeToolCall = async (
       return executeReadFileTool(toolCall);
     case "write":
       return executeWriteFileTool(toolCall);
+    case "edit":
+      return executeEditFileTool(toolCall);
     case "bash":
       return executeBashTool(toolCall);
     default:

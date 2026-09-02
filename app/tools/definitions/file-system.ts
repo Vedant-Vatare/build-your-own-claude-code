@@ -39,3 +39,43 @@ export const WriteFileTool: ChatCompletionTool = {
     },
   },
 };
+
+export const EditFileTool: ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "Edit",
+    description: "Apply one or more context-checked edits to files.",
+    parameters: {
+      type: "object",
+      properties: {
+        changes: {
+          type: "array",
+          description: "The file changes to apply",
+          items: {
+            type: "object",
+            properties: {
+              file_path: {
+                type: "string",
+                description: "Path to the file.",
+              },
+              old_string: {
+                type: "string",
+                description: "Exact content need to be replaced",
+              },
+              new_string: {
+                type: "string",
+                description: "new content to be replaced with",
+              },
+              replace_all: {
+                type: "boolean",
+                description: "whether to replace all the matching content or not",
+              },
+            },
+            required: ["file_path", "old_string", "new_string"],
+          },
+        },
+      },
+      required: ["changes"],
+    },
+  },
+};
