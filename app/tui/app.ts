@@ -4,12 +4,12 @@ import {
   createCliRenderer,
   InputRenderable,
   RGBA,
-  ScrollBoxRenderable,
   TextRenderable,
 } from "@opentui/core";
 import { agent } from "../agent";
 import { ACCENT, DIM, ERROR, WHITE } from "./constants";
 import { createHeader } from "./layout/header";
+import { addMessageToSession, createSession } from "./layout/session";
 
 export const startTui = async () => {
   const renderer = await createCliRenderer({ exitOnCtrlC: false });
@@ -43,23 +43,7 @@ export const startTui = async () => {
 
   const header = createHeader(renderer, { model, effort, cwd, branch });
 
-  const transcript = new ScrollBoxRenderable(renderer, {
-    flexGrow: 1,
-    width: "100%",
-    stickyScroll: true,
-    stickyStart: "bottom",
-    contentOptions: { justifyContent: "flex-end" },
-  });
-  const say = (content: string, fg?: string) => {
-    transcript.add(
-      new TextRenderable(renderer, {
-        content,
-        ...(fg ? { fg } : {}),
-        flexShrink: 0,
-      }),
-    );
-    renderer.requestRender();
-  };
+  const session = createSession(renderer);
 
   const inputBox = new BoxRenderable(renderer, {
     height: 3,
@@ -83,7 +67,7 @@ export const startTui = async () => {
   inputBox.add(input);
 
   root.add(header);
-  root.add(transcript);
+  root.add(session);
   root.add(inputBox);
   renderer.root.add(root);
   input.focus();
@@ -102,24 +86,43 @@ export const startTui = async () => {
       shutdown();
       return;
     }
-    if (text === "/help") {
-      say("Commands: /help  /exit   Ctrl+C quits", DIM);
-      input.focus();
-      return;
-    }
+
     if (busy) {
-      say("Still working, wait for the current response.", DIM);
+      addMessageToSession({
+        session,
+        renderer,
+        content: "Still working, wait for the current response.",
+      });
       input.focus();
       return;
     }
 
     busy = true;
-    say(`❯ ${text}`, ACCENT);
+
+    addMessageToSession({
+      session,
+      renderer,
+      content: `❯ ${text}`,
+      fg: ACCENT,
+    });
     try {
-      const out = await agent(text);
-      if (out) say(String(out));
+      const agentResponse = await agent(text);
+      if (agentResponse) {
+        addMessageToSession({
+          session,
+          renderer,
+          content: agentResponse,
+          fg: WHITE,
+        });
+      }
     } catch (e) {
-      say(e instanceof Error ? e.message : String(e), ERROR);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      addMessageToSession({
+        session,
+        renderer,
+        content: errorMessage,
+        fg: ERROR,
+      });
     } finally {
       busy = false;
       input.focus();
