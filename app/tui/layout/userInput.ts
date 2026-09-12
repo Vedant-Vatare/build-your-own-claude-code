@@ -7,9 +7,9 @@ import {
   TextRenderable,
 } from "@opentui/core";
 import { agent } from "../../agent";
-import { ACCENT, DIM, ERROR, WHITE } from "../constants";
+import { DIM, ERROR, WHITE } from "../constants";
 import { shutdown } from "../utils/tui.utils";
-import { addMessageToSession } from "./session";
+import { addMessageToSession, addUserMessageToSession } from "./session";
 
 export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRenderer) => {
   const inputBox = new BoxRenderable(renderer, {
@@ -33,6 +33,7 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
   });
   inputBox.add(input);
   let busy = false;
+
   const handleUserInputSubmit = async (value: string) => {
     const text = value.trim();
     input.value = "";
@@ -57,11 +58,10 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
 
     busy = true;
 
-    addMessageToSession({
+    addUserMessageToSession({
       session,
       renderer,
-      content: `❯ ${text}`,
-      fg: ACCENT,
+      content: `${text}`,
     });
     try {
       const agentResponse = await agent(text);

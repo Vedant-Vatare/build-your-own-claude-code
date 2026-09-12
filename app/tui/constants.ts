@@ -1,4 +1,4 @@
-export const ACCENT = "#788bff";
+export const ACCENT = "#8661C1";
 export const WHITE = "#FFFFFF";
 export const DIM = "brightBlack";
 export const ERROR = "brightRed";
