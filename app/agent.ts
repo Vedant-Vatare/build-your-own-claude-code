@@ -61,8 +61,7 @@ export const agent = async (prompt: string) => {
     });
 
     if (response.choices[0].finish_reason === "stop") {
-      console.log(sessionMessages[sessionMessages.length - 1].content);
-      break;
+      return sessionMessages[sessionMessages.length - 1].content;
     }
   }
 };
