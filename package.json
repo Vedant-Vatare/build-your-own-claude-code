@@ -1,15 +1,17 @@
 {
-	"name": "@codecrafters/claude-code",
-	"description": "Build your own Claude Code challenge, from CodeCrafters",
-	"type": "module",
-	"scripts": {
-		"dev": "bun run app/main.ts"
-	},
-	"dependencies": {
-		"openai": "^6.16.0"
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.5.11",
-		"@types/bun": "latest"
-	}
+  "name": "Syntax",
+  "version": "0.1.0",
+  "description": "The TUI coding agent",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run app/main.ts"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.5.10",
+    "openai": "^6.16.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.11",
+    "@types/bun": "latest"
+  }
 }
