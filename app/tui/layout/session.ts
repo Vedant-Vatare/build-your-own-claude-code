@@ -4,7 +4,7 @@ import {
   ScrollBoxRenderable,
   TextRenderable,
 } from "@opentui/core";
-import { ACCENT, WHITE } from "../constants";
+import { ACCENT, DIM, WHITE } from "../constants";
 
 export const createSession = (renderer: CliRenderer) => {
   return new ScrollBoxRenderable(renderer, {
@@ -45,6 +45,48 @@ export const addMessageToSession = ({ session, renderer, content, fg }: SessionM
   );
   session.add(wrapper);
   renderer.requestRender();
+};
+
+type StreamingMessageArgs = {
+  session: ScrollBoxRenderable;
+  renderer: CliRenderer;
+  initialContent?: string;
+  fg?: string;
+};
+
+export type StreamingMessage = {
+  set: (content: string, fg?: string) => void;
+};
+
+export const createStreamingMessage = ({
+  session,
+  renderer,
+  initialContent = "thinking...",
+  fg = DIM,
+}: StreamingMessageArgs): StreamingMessage => {
+  const wrapper = new BoxRenderable(renderer, {
+    width: "100%",
+    flexShrink: 0,
+    paddingLeft: 2,
+    paddingRight: 1,
+  });
+  const text = new TextRenderable(renderer, {
+    content: initialContent,
+    fg,
+    width: "100%",
+    flexShrink: 0,
+    wrapMode: "word",
+  });
+  wrapper.add(text);
+  session.add(wrapper);
+  renderer.requestRender();
+  return {
+    set: (content: string, fg = WHITE) => {
+      text.fg = fg;
+      text.content = content;
+      renderer.requestRender();
+    },
+  };
 };
 
 type UserMessageArgs = {

@@ -9,7 +9,7 @@ import {
 import { agent } from "../../agent";
 import { DIM, ERROR, WHITE } from "../constants";
 import { shutdown } from "../utils/tui.utils";
-import { addMessageToSession, addUserMessageToSession } from "./session";
+import { addMessageToSession, addUserMessageToSession, createStreamingMessage } from "./session";
 
 export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRenderer) => {
   const inputBox = new BoxRenderable(renderer, {
@@ -63,24 +63,27 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
       renderer,
       content: `${text}`,
     });
+
+    const live = createStreamingMessage({
+      session,
+      renderer,
+      initialContent: "Thinking",
+      fg: DIM,
+    });
+
+    let streamed = "";
+
+    const appendStreamedDelta = (delta: string) => {
+      streamed += delta;
+      live.set(streamed);
+    };
+
     try {
-      const agentResponse = await agent(text);
-      if (agentResponse) {
-        addMessageToSession({
-          session,
-          renderer,
-          content: agentResponse,
-          fg: WHITE,
-        });
-      }
+      const agentResponse = await agent(text, appendStreamedDelta);
+      live.set(agentResponse || streamed || "(no response)", WHITE);
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      addMessageToSession({
-        session,
-        renderer,
-        content: errorMessage,
-        fg: ERROR,
-      });
+      live.set(errorMessage, ERROR);
     } finally {
       busy = false;
       input.focus();
