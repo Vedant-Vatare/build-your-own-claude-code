@@ -1,6 +1,7 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
 import type { ChatCompletionMessageFunctionToolCall } from "openai/resources";
+import { debug } from "../../debug";
 import type { BashToolArgs, ToolCallResult } from "../../types";
 
 const execAsync = promisify(exec);
@@ -9,7 +10,7 @@ export const executeBashTool = async (
 ): Promise<ToolCallResult> => {
   const { command } = JSON.parse(toolCall.function.arguments) as BashToolArgs;
   if (!command) {
-    console.error("command cannot be undefined");
+    debug("command cannot be undefined");
     return {
       role: "tool",
       tool_call_id: toolCall.id,

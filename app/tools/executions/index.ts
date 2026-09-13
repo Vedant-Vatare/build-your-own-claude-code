@@ -1,4 +1,5 @@
 import type { ChatCompletionMessageToolCall } from "openai/resources";
+import { debug } from "../../debug";
 import type { ToolCallResult } from "../../types";
 import { executeBashTool } from "./command-line";
 import { executeEditFileTool, executeReadFileTool, executeWriteFileTool } from "./file-system";
@@ -11,6 +12,8 @@ export const executeToolCall = async (
   }
 
   const toolName = toolCall.function.name.toLowerCase();
+  debug({ toolName, args: toolCall.function.arguments });
+
   switch (toolName) {
     case "read":
       return executeReadFileTool(toolCall);

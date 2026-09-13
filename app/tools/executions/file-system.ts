@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import type { ChatCompletionMessageFunctionToolCall } from "openai/resources";
+import { debug } from "../../debug";
 import type {
   EditFileToolArgs,
   ReadToolArgs,
@@ -13,7 +14,7 @@ export const executeReadFileTool = async (
   const { file_path } = JSON.parse(toolCall.function.arguments) as ReadToolArgs;
 
   if (!file_path) {
-    console.error("file path cannot be undefined");
+    debug("file path cannot be undefined");
 
     return { role: "tool", tool_call_id: toolCall.id, content: "file path cannot be undefined" };
   }
@@ -28,7 +29,7 @@ export const executeWriteFileTool = async (
   const { file_path, content } = JSON.parse(toolCall.function.arguments) as WriteFileToolArgs;
 
   if (!file_path || !content) {
-    console.error("file path or content cannot be undefined");
+    debug("file path or content cannot be undefined");
     return {
       role: "tool",
       tool_call_id: toolCall.id,
