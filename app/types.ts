@@ -13,6 +13,11 @@ export type BashToolArgs = {
   command: string;
 };
 
+export type GlobToolArgs = {
+  pattern: string;
+  path?: string;
+};
+
 export type EditFileToolArgs = {
   changes: {
     file_path: string;

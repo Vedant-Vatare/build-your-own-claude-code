@@ -79,3 +79,28 @@ export const EditFileTool: ChatCompletionTool = {
     },
   },
 };
+
+export const GlobTool: ChatCompletionTool = {
+  type: "function",
+  function: {
+    name: "Glob",
+    description:
+      "Fast file pattern matching tool. Use this when you need to find files by name patterns. ",
+    parameters: {
+      type: "object",
+      properties: {
+        pattern: {
+          type: "string",
+          description: "The glob pattern to match files against",
+        },
+        path: {
+          type: "string",
+          description:
+            "The directory to search in. If not specified, the current working directory will be used.",
+        },
+      },
+      required: ["pattern"],
+      additionalProperties: false,
+    },
+  },
+};

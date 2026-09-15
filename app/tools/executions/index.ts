@@ -2,7 +2,7 @@ import type { ChatCompletionMessageToolCall } from "openai/resources";
 import { debug } from "../../debug";
 import type { ToolCallResult } from "../../types";
 import { executeBashTool } from "./command-line";
-import { executeEditFileTool, executeReadFileTool, executeWriteFileTool } from "./file-system";
+import { executeEditFileTool, executeGlobTool, executeReadFileTool, executeWriteFileTool } from "./file-system";
 
 export const executeToolCall = async (
   toolCall: ChatCompletionMessageToolCall,
@@ -23,6 +23,8 @@ export const executeToolCall = async (
       return executeEditFileTool(toolCall);
     case "bash":
       return executeBashTool(toolCall);
+    case "glob":
+      return executeGlobTool(toolCall);
     default:
   }
   return {
