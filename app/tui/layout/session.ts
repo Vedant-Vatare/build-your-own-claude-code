@@ -1,10 +1,11 @@
 import {
   BoxRenderable,
   type CliRenderer,
+  type RGBA,
   ScrollBoxRenderable,
   TextRenderable,
 } from "@opentui/core";
-import { ACCENT, DIM, WHITE } from "../constants";
+import { ACCENT, BASE_TEXT, DIM } from "../constants";
 
 export const createSession = (renderer: CliRenderer) => {
   return new ScrollBoxRenderable(renderer, {
@@ -13,10 +14,10 @@ export const createSession = (renderer: CliRenderer) => {
     stickyScroll: true,
     stickyStart: "bottom",
     contentOptions: { justifyContent: "flex-end", gap: 2 },
-    marginLeft: 2,
-    marginRight: 2,
-    paddingLeft: 1,
-    paddingRight: 1,
+    marginLeft: 1,
+    marginRight: 1,
+    paddingLeft: 0,
+    paddingRight: 0,
   });
 };
 
@@ -24,14 +25,14 @@ type SessionMessageArgs = {
   session: ScrollBoxRenderable;
   renderer: CliRenderer;
   content: string;
-  fg?: string;
+  fg?: string | RGBA;
 };
 
 export const addMessageToSession = ({ session, renderer, content, fg }: SessionMessageArgs) => {
   const wrapper = new BoxRenderable(renderer, {
     width: "100%",
     flexShrink: 0,
-    paddingLeft: 2,
+    paddingLeft: 1,
     paddingRight: 1,
   });
   wrapper.add(
@@ -51,11 +52,11 @@ type StreamingMessageArgs = {
   session: ScrollBoxRenderable;
   renderer: CliRenderer;
   initialContent?: string;
-  fg?: string;
+  fg?: string | RGBA;
 };
 
 export type StreamingMessage = {
-  set: (content: string, fg?: string) => void;
+  set: (content: string, fg?: string | RGBA) => void;
 };
 
 export const createStreamingMessage = ({
@@ -67,7 +68,7 @@ export const createStreamingMessage = ({
   const wrapper = new BoxRenderable(renderer, {
     width: "100%",
     flexShrink: 0,
-    paddingLeft: 2,
+    paddingLeft: 1,
     paddingRight: 1,
   });
   const text = new TextRenderable(renderer, {
@@ -81,7 +82,7 @@ export const createStreamingMessage = ({
   session.add(wrapper);
   renderer.requestRender();
   return {
-    set: (content: string, fg = WHITE) => {
+    set: (content: string, fg = BASE_TEXT) => {
       text.fg = fg;
       text.content = content;
       renderer.requestRender();
@@ -93,14 +94,14 @@ type UserMessageArgs = {
   session: ScrollBoxRenderable;
   renderer: CliRenderer;
   content: string;
-  fg?: string;
+  fg?: string | RGBA;
 };
 
 export const addUserMessageToSession = ({
   session,
   renderer,
   content,
-  fg = WHITE,
+  fg = BASE_TEXT,
 }: UserMessageArgs) => {
   const wrapper = new BoxRenderable(renderer, {
     flexDirection: "row",

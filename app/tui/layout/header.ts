@@ -1,5 +1,5 @@
-import { BoxRenderable, type CliRenderer, TextRenderable } from "@opentui/core";
-import { DIM, VERSION, WHITE } from "../constants";
+import { BoxRenderable, type CliRenderer, fg, TextRenderable, t } from "@opentui/core";
+import { ACCENT, BASE_TEXT, DIM, VERSION } from "../constants";
 
 export type HeaderData = {
   model: string;
@@ -39,8 +39,7 @@ export const createHeader = (renderer: CliRenderer, data: HeaderData) => {
   });
 
   const title = new TextRenderable(renderer, {
-    content: `Syntax  (v${VERSION})`,
-    fg: WHITE,
+    content: t`${fg(ACCENT)("Syntax")}  ${fg(DIM)(`(v${VERSION})`)}`,
     flexShrink: 0,
   });
   header.add(title);
@@ -48,16 +47,15 @@ export const createHeader = (renderer: CliRenderer, data: HeaderData) => {
   const modelValue = [data.model, data.effort].filter(Boolean).join(" · ") || "no model set";
   header.add(
     new TextRenderable(renderer, {
-      content: `${"model:".padEnd(10)}  ${modelValue}`,
-      fg: DIM,
+      content: t`${fg(DIM)(`${"model:".padEnd(10)}  `)}${fg(BASE_TEXT)(modelValue)}`,
       flexShrink: 0,
     }),
   );
   const shortCwd = truncatePath(data.cwd);
+  const directoryValue = data.branch ? `${shortCwd}:${data.branch}` : shortCwd;
   header.add(
     new TextRenderable(renderer, {
-      content: `${"directory:".padEnd(10)}  ${data.branch ? `${shortCwd}:${data.branch}` : shortCwd}`,
-      fg: DIM,
+      content: t`${fg(DIM)(`${"directory:".padEnd(10)}  `)}${fg(BASE_TEXT)(directoryValue)}`,
       flexShrink: 0,
     }),
   );
