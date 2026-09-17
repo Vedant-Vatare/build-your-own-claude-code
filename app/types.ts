@@ -1,5 +1,11 @@
 import type { ChatCompletionMessageToolCall } from "openai/resources";
 
+export type AgentParams = {
+  prompt: string;
+  onTextStream?: (delta: string, fullContent: string) => void;
+  onToolUse?: (event: ToolActivityEvent) => void;
+};
+
 export type ReadToolArgs = {
   file_path: string;
 };
@@ -31,6 +37,16 @@ export type ToolCallResult = {
   role: "tool";
   tool_call_id: string;
   content: string;
+};
+
+export type ToolActivityState = "queued" | "running" | "succeeded" | "failed";
+
+export type ToolActivityEvent = {
+  id: string;
+  name: string;
+  args: string;
+  state: ToolActivityState;
+  error?: string;
 };
 
 export type UserMessage = { role: "user"; content: string };

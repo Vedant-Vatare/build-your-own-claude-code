@@ -3,11 +3,9 @@ import type { ChatCompletionMessageToolCall } from "openai/resources";
 import { sessionMessages } from "./main";
 import { chatCompletionTools } from "./tools/definitions";
 import { executeToolCall } from "./tools/executions";
+import type { AgentParams, ToolActivityEvent } from "./types";
 
-export const agent = async (
-  prompt: string,
-  onToken?: (delta: string, fullContent: string) => void,
-) => {
+export const agent = async ({ prompt, onTextStream, onToolUse }: AgentParams) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const model = process.env.MODEL;
   const baseURL = process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1";
@@ -49,7 +47,7 @@ export const agent = async (
       const delta = choice.delta;
       if (delta?.content) {
         content += delta.content;
-        onToken?.(delta.content, content);
+        onTextStream?.(delta.content, content);
       }
       if (delta?.tool_calls) {
         for (const tc of delta.tool_calls) {
@@ -89,34 +87,58 @@ export const agent = async (
       return content;
     }
 
+    const updateToolActivity = (
+      toolCall: ChatCompletionMessageToolCall,
+      state: ToolActivityEvent["state"],
+      error?: string,
+    ): void => {
+      if (toolCall.type !== "function") return;
+      onToolUse?.({
+        id: toolCall.id,
+        name: toolCall.function.name,
+        args: toolCall.function.arguments,
+        state,
+        ...(error ? { error } : {}),
+      });
+    };
+
+    for (const toolCall of toolCalls) {
+      updateToolActivity(toolCall, "queued");
+    }
+
     const toolCallResults = await Promise.allSettled(
-      toolCalls.map((toolcall: ChatCompletionMessageToolCall) => executeToolCall(toolcall)),
+      toolCalls.map(async (toolcall: ChatCompletionMessageToolCall) => {
+        updateToolActivity(toolcall, "running");
+        try {
+          const result = await executeToolCall(toolcall);
+          updateToolActivity(toolcall, "succeeded");
+          return result;
+        } catch (error) {
+          updateToolActivity(
+            toolcall,
+            "failed",
+            error instanceof Error ? `${error.name}: ${error.message}` : "Error executing tool",
+          );
+          throw error;
+        }
+      }),
     );
 
-    toolCallResults.forEach(
-      (
-        toolCallResult: PromiseSettledResult<{
-          role: "tool";
-          tool_call_id: string;
-          content: string;
-        }>,
-        index: number,
-      ) => {
-        if (toolCallResult.status === "fulfilled") {
-          sessionMessages.push(toolCallResult.value);
-        } else {
-          const errorMessage =
-            toolCallResult.reason instanceof Error
-              ? `${toolCallResult.reason.name}: ${toolCallResult.reason.message}`
-              : "Error executing tool";
-          sessionMessages.push({
-            role: "tool",
-            tool_call_id: toolCalls[index].id,
-            content: errorMessage,
-          });
-        }
-      },
-    );
+    toolCallResults.forEach((toolCallResult, index) => {
+      if (toolCallResult.status === "fulfilled") {
+        sessionMessages.push(toolCallResult.value);
+      } else {
+        const errorMessage =
+          toolCallResult.reason instanceof Error
+            ? `${toolCallResult.reason.name}: ${toolCallResult.reason.message}`
+            : "Error executing tool";
+        sessionMessages.push({
+          role: "tool",
+          tool_call_id: toolCalls[index].id,
+          content: errorMessage,
+        });
+      }
+    });
 
     if (finishReason === "stop") {
       return content;

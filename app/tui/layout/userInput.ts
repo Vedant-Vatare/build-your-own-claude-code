@@ -6,9 +6,15 @@ import {
   TextRenderable,
 } from "@opentui/core";
 import { agent } from "../../agent";
-import { BASE_TEXT, DIM, ERROR } from "../constants";
+import type { ToolActivityEvent } from "../../types";
+import { ACCENT, BASE_TEXT, DIM, ERROR } from "../constants";
 import { shutdown } from "../utils/tui.utils";
-import { addMessageToSession, addUserMessageToSession, createStreamingMessage } from "./session";
+import {
+  addMessageToSession,
+  addUserMessageToSession,
+  createStreamingMessage,
+  type ToolRow,
+} from "./session";
 
 export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRenderer) => {
   const inputBox = new BoxRenderable(renderer, {
@@ -24,7 +30,7 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
     paddingLeft: 1,
     paddingRight: 1,
   });
-  inputBox.add(new TextRenderable(renderer, { content: "❯ ", fg: BASE_TEXT }));
+  inputBox.add(new TextRenderable(renderer, { content: "❯ ", fg: ACCENT }));
   const input = new InputRenderable(renderer, {
     flexGrow: 1,
     textColor: BASE_TEXT,
@@ -70,19 +76,45 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
       fg: DIM,
     });
 
-    let streamed = "";
+    let producedOutput = false;
+    const toolRows = new Map<string, ToolRow>();
 
-    const appendStreamedDelta = (delta: string) => {
-      streamed += delta;
-      live.set(streamed);
+    const failInflightTools = (): void => {
+      for (const row of toolRows.values()) {
+        row.setToolState("failed");
+      }
+      toolRows.clear();
     };
 
     try {
-      const agentResponse = await agent(text, appendStreamedDelta);
-      live.set(agentResponse || streamed || "(no response)", BASE_TEXT);
+      const onTextStream = (delta: string) => {
+        producedOutput = true;
+        live.appendText(delta);
+      };
+
+      const onToolUse = (event: ToolActivityEvent) => {
+        producedOutput = true;
+        let toolRow = toolRows.get(event.id);
+        if (!toolRow) {
+          toolRow = live.addToolRow(event.name, event.args);
+          toolRows.set(event.id, toolRow);
+        }
+        if (event.state === "succeeded" || event.state === "failed") {
+          toolRows.delete(event.id);
+        }
+        toolRow.setToolState(event.state, event.error);
+      };
+
+      const agentResponse = await agent({ prompt: text, onTextStream, onToolUse });
+
+      toolRows.clear();
+      if (!agentResponse && !producedOutput) {
+        live.appendText("(no response)");
+      }
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : String(e);
-      live.set(errorMessage, ERROR);
+      failInflightTools();
+      live.appendText(errorMessage, ERROR);
     } finally {
       busy = false;
       input.focus();
