@@ -10,6 +10,7 @@ import {
 import type { ToolActivityState } from "../../types";
 import { ACCENT, BASE_TEXT, DIM, ERROR, GREEN, WHITE } from "../constants";
 import { describeToolCall } from "../utils/tools.utils";
+import { paragraphTextRenderer } from "../utils/tui.utils";
 
 export const createSession = (renderer: CliRenderer) => {
   return new ScrollBoxRenderable(renderer, {
@@ -40,11 +41,9 @@ export const addMessageToSession = ({ session, renderer, content, fg }: SessionM
     paddingRight: 1,
   });
   wrapper.add(
-    new TextRenderable(renderer, {
+    paragraphTextRenderer(renderer, {
       content,
       ...(fg ? { fg } : {}),
-      flexShrink: 0,
-      wrapMode: "word",
     }),
   );
   session.add(wrapper);
@@ -101,22 +100,16 @@ export const createStreamingMessage = ({
   let currentText: { node: TextRenderable; fg: string | RGBA; empty: boolean } | null = null;
 
   const openTextBlock = (blockFg: string | RGBA): TextRenderable => {
-    const node = new TextRenderable(renderer, {
-      fg: blockFg,
-      flexShrink: 0,
-      wrapMode: "word",
-    });
+    const node = paragraphTextRenderer(renderer, { fg: blockFg });
     wrapper.add(node);
     return node;
   };
 
   if (initialContent) {
     wrapper.add(
-      new TextRenderable(renderer, {
+      paragraphTextRenderer(renderer, {
         content: initialContent,
         fg,
-        flexShrink: 0,
-        wrapMode: "word",
       }),
     );
   }
@@ -261,11 +254,9 @@ export const addUserMessageToSession = ({
     paddingRight: 1,
   });
   body.add(
-    new TextRenderable(renderer, {
+    paragraphTextRenderer(renderer, {
       content,
       fg,
-      flexShrink: 0,
-      wrapMode: "word",
     }),
   );
   wrapper.add(body);

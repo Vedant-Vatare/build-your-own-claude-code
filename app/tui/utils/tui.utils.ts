@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import type { CliRenderer } from "@opentui/core";
+import { type CliRenderer, type TextOptions, TextRenderable } from "@opentui/core";
 
 let shuttingDown = false;
 export const shutdown = (renderer: CliRenderer) => {
@@ -27,4 +27,11 @@ export const getShellInfo = () => {
     branch = "";
   }
   return { cwd, branch };
+};
+
+export const paragraphTextRenderer = (
+  renderer: CliRenderer,
+  options: TextOptions,
+): TextRenderable => {
+  return new TextRenderable(renderer, { flexShrink: 0, wrapMode: "word", ...options });
 };
