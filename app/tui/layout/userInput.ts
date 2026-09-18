@@ -17,10 +17,33 @@ type UserInputHandler = {
   textarea: TextareaRenderable;
 };
 
+const MAX_COMPOSER_LINES = 8;
+
+const clampComposerLines = (lines: number): number =>
+  Math.min(Math.max(lines, 1), MAX_COMPOSER_LINES);
+
+const scheduleComposerHeight = (() => {
+  let queued = false;
+  return (textarea: TextareaRenderable): void => {
+    if (queued) {
+      return;
+    }
+    queued = true;
+    queueMicrotask(() => {
+      queued = false;
+      if (textarea.isDestroyed) {
+        return;
+      }
+      textarea.height = clampComposerLines(Math.max(textarea.lineCount, textarea.virtualLineCount));
+    });
+  };
+})();
+
 const userInputSubmitHandler = async ({ session, renderer, textarea }: UserInputHandler) => {
   const text = textarea.plainText.trim();
 
   textarea.setText("");
+  scheduleComposerHeight(textarea);
   renderer.requestRender();
   if (!text) {
     textarea.focus();
@@ -90,10 +113,9 @@ const userInputSubmitHandler = async ({ session, renderer, textarea }: UserInput
 
 export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRenderer) => {
   const inputBox = new BoxRenderable(renderer, {
-    height: 3,
     flexShrink: 0,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     border: ["top", "bottom"],
     borderStyle: "single",
     borderColor: DIM,
@@ -106,6 +128,9 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
 
   const textarea = new TextareaRenderable(renderer, {
     flexGrow: 1,
+    height: 1,
+    minHeight: 1,
+    maxHeight: MAX_COMPOSER_LINES,
     textColor: BASE_TEXT,
     cursorStyle: { style: "default" },
     keyBindings: [
@@ -123,6 +148,7 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
       void userInputSubmitHandler({ session, renderer, textarea });
     },
   });
+  textarea.on("line-info-change", () => scheduleComposerHeight(textarea));
   inputBox.add(textarea);
 
   return { inputBox, textarea };
