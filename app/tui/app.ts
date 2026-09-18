@@ -20,11 +20,11 @@ export const startTui = async () => {
 
   const session = createSession(renderer);
 
-  const { inputBox, input } = createUserInput(session, renderer);
+  const { inputBox, textarea } = createUserInput(session, renderer);
 
   root.add(header);
   root.add(session);
   root.add(inputBox);
   renderer.root.add(root);
-  input.focus();
+  textarea.focus();
 };
