@@ -35,3 +35,15 @@ export const paragraphTextRenderer = (
 ): TextRenderable => {
   return new TextRenderable(renderer, { flexShrink: 0, wrapMode: "word", ...options });
 };
+
+export const composerRows = (text: string, boxWidth: number): number => {
+  const lines = text.split("\n");
+  if (boxWidth <= 0) {
+    return lines.length;
+  }
+  let rows = 0;
+  for (const line of lines) {
+    rows += Math.max(1, Math.ceil(Bun.stringWidth(line) / boxWidth));
+  }
+  return rows;
+};

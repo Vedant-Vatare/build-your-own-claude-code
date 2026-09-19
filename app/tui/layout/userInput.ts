@@ -9,7 +9,7 @@ import { agent } from "../../agent";
 import { sessionMessages } from "../../store";
 import type { ToolActivityEvent } from "../../types";
 import { ACCENT, BASE_TEXT, DIM, ERROR } from "../constants";
-import { shutdown } from "../utils/tui.utils";
+import { composerRows, shutdown } from "../utils/tui.utils";
 import {
   addQueuedUserMessageToSession,
   addUserMessageToSession,
@@ -27,10 +27,26 @@ type UserInputHandler = {
 
 type ComposerText = UserInputHandler & { text: string };
 
-const MAX_COMPOSER_LINES = 8;
+const COMPOSER_MAX_LINES = 5;
 
 const clampComposerLines = (lines: number): number =>
-  Math.min(Math.max(lines, 1), MAX_COMPOSER_LINES);
+  Math.min(Math.max(lines, 1), COMPOSER_MAX_LINES);
+
+let heightSyncQueued = false;
+
+const scheduleComposerHeight = (textarea: TextareaRenderable): void => {
+  if (heightSyncQueued) {
+    return;
+  }
+  heightSyncQueued = true;
+  queueMicrotask(() => {
+    heightSyncQueued = false;
+    if (textarea.isDestroyed) {
+      return;
+    }
+    textarea.height = clampComposerLines(composerRows(textarea.plainText, textarea.width));
+  });
+};
 
 type ComposerReading = { kind: "empty" } | { kind: "exit" } | { kind: "ready"; text: string };
 
@@ -47,23 +63,6 @@ const readComposer = (textarea: TextareaRenderable): ComposerReading => {
 
 const clearComposer = (textarea: TextareaRenderable): void => {
   textarea.setText("");
-  scheduleComposerHeight(textarea);
-};
-
-let heightSyncQueued = false;
-
-const scheduleComposerHeight = (textarea: TextareaRenderable): void => {
-  if (heightSyncQueued) {
-    return;
-  }
-  heightSyncQueued = true;
-  queueMicrotask(() => {
-    heightSyncQueued = false;
-    if (textarea.isDestroyed) {
-      return;
-    }
-    textarea.height = clampComposerLines(Math.max(textarea.lineCount, textarea.virtualLineCount));
-  });
 };
 
 const queuedMessages: { text: string; item: QueuedItem }[] = [];
@@ -250,7 +249,8 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
     flexGrow: 1,
     height: 1,
     minHeight: 1,
-    maxHeight: MAX_COMPOSER_LINES,
+    maxHeight: COMPOSER_MAX_LINES,
+    wrapMode: "word",
     textColor: BASE_TEXT,
     cursorStyle: { style: "default" },
     keyBindings: [
@@ -270,6 +270,7 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
   });
 
   textarea.on("line-info-change", () => scheduleComposerHeight(textarea));
+  textarea.on("resize", () => scheduleComposerHeight(textarea));
   inputBox.add(textarea);
 
   renderer.keyInput.on("keypress", (key) => {
