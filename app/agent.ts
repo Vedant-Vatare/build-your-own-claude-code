@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { ChatCompletionMessageToolCall } from "openai/resources";
 import { sessionMessages } from "./store";
+import { buildSystemPrompt } from "./systemPrompt";
 import { chatCompletionTools } from "./tools/definitions";
 import { executeToolCall } from "./tools/executions";
 import type { AgentParams, ToolActivityEvent } from "./types";
@@ -21,6 +22,10 @@ export const agent = async ({ prompt, onTextStream, onToolUse }: AgentParams) =>
     apiKey: apiKey,
     baseURL: baseURL,
   });
+
+  if (!sessionMessages.some((m) => m.role === "system")) {
+    sessionMessages.unshift({ role: "system", content: buildSystemPrompt() });
+  }
 
   sessionMessages.push({ role: "user", content: prompt });
 

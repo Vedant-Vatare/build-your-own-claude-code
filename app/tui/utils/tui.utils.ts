@@ -1,5 +1,5 @@
-import { execSync } from "node:child_process";
 import { type CliRenderer, type TextOptions, TextRenderable } from "@opentui/core";
+import { getShellInfo as getSharedShellInfo } from "../../agent.utils";
 
 let shuttingDown = false;
 export const shutdown = (renderer: CliRenderer) => {
@@ -14,20 +14,7 @@ export const getInitialModelInfo = () => {
   return { model, effort };
 };
 
-export const getShellInfo = () => {
-  const cwd = process.cwd();
-  let branch = "";
-  try {
-    branch = execSync("git branch --show-current", {
-      cwd,
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    branch = "";
-  }
-  return { cwd, branch };
-};
+export const getShellInfo = () => getSharedShellInfo();
 
 export const paragraphTextRenderer = (
   renderer: CliRenderer,

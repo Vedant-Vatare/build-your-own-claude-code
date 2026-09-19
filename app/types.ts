@@ -49,6 +49,7 @@ export type ToolActivityEvent = {
   error?: string;
 };
 
+export type SystemMessage = { role: "system"; content: string };
 export type UserMessage = { role: "user"; content: string };
 export type AssistantMessage = {
   role: "assistant";
@@ -56,6 +57,6 @@ export type AssistantMessage = {
   tool_calls?: ChatCompletionMessageToolCall[];
 };
 
-export type ResponseMessage = UserMessage | AssistantMessage;
+export type ResponseMessage = SystemMessage | UserMessage | AssistantMessage;
 
 export type ResponseMessages = (ResponseMessage | ToolCallResult)[];
