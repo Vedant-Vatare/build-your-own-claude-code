@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { ChatCompletionMessageToolCall } from "openai/resources";
-import { sessionMessages } from "./main";
+import { sessionMessages } from "./store";
 import { chatCompletionTools } from "./tools/definitions";
 import { executeToolCall } from "./tools/executions";
 import type { AgentParams, ToolActivityEvent } from "./types";

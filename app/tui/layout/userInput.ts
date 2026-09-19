@@ -6,10 +6,18 @@ import {
   TextRenderable,
 } from "@opentui/core";
 import { agent } from "../../agent";
+import { sessionMessages } from "../../store";
 import type { ToolActivityEvent } from "../../types";
 import { ACCENT, BASE_TEXT, DIM, ERROR } from "../constants";
 import { shutdown } from "../utils/tui.utils";
-import { addUserMessageToSession, createStreamingMessage, type ToolRow } from "./session";
+import {
+  addQueuedUserMessageToSession,
+  addUserMessageToSession,
+  createStreamingMessage,
+  type QueuedItem,
+  removeQueuedChip,
+  type ToolRow,
+} from "./session";
 
 type UserInputHandler = {
   session: ScrollBoxRenderable;
@@ -17,54 +25,85 @@ type UserInputHandler = {
   textarea: TextareaRenderable;
 };
 
+type ComposerText = UserInputHandler & { text: string };
+
 const MAX_COMPOSER_LINES = 8;
 
 const clampComposerLines = (lines: number): number =>
   Math.min(Math.max(lines, 1), MAX_COMPOSER_LINES);
 
-const scheduleComposerHeight = (() => {
-  let queued = false;
-  return (textarea: TextareaRenderable): void => {
-    if (queued) {
-      return;
-    }
-    queued = true;
-    queueMicrotask(() => {
-      queued = false;
-      if (textarea.isDestroyed) {
-        return;
-      }
-      textarea.height = clampComposerLines(Math.max(textarea.lineCount, textarea.virtualLineCount));
-    });
-  };
-})();
+type ComposerReading = { kind: "empty" } | { kind: "exit" } | { kind: "ready"; text: string };
 
-const userInputSubmitHandler = async ({ session, renderer, textarea }: UserInputHandler) => {
+const readComposer = (textarea: TextareaRenderable): ComposerReading => {
   const text = textarea.plainText.trim();
-
-  textarea.setText("");
-  scheduleComposerHeight(textarea);
-  renderer.requestRender();
   if (!text) {
-    textarea.focus();
-    return;
+    return { kind: "empty" };
   }
   if (text === "/exit" || text === "/quit") {
-    shutdown(renderer);
+    return { kind: "exit" };
+  }
+  return { kind: "ready", text };
+};
+
+const clearComposer = (textarea: TextareaRenderable): void => {
+  textarea.setText("");
+  scheduleComposerHeight(textarea);
+};
+
+let heightSyncQueued = false;
+
+const scheduleComposerHeight = (textarea: TextareaRenderable): void => {
+  if (heightSyncQueued) {
     return;
   }
-
-  addUserMessageToSession({
-    session,
-    renderer,
-    content: `${text}`,
+  heightSyncQueued = true;
+  queueMicrotask(() => {
+    heightSyncQueued = false;
+    if (textarea.isDestroyed) {
+      return;
+    }
+    textarea.height = clampComposerLines(Math.max(textarea.lineCount, textarea.virtualLineCount));
   });
+};
+
+const queuedMessages: { text: string; item: QueuedItem }[] = [];
+let busy = false;
+
+type SendMessageArgs = {
+  session: ScrollBoxRenderable;
+  renderer: CliRenderer;
+  textarea: TextareaRenderable;
+  text: string;
+  echoUserMessage: boolean;
+  queuedItem?: QueuedItem;
+};
+
+const sendMessage = async ({
+  session,
+  renderer,
+  textarea,
+  text,
+  echoUserMessage,
+  queuedItem,
+}: SendMessageArgs) => {
+  if (echoUserMessage) {
+    addUserMessageToSession({
+      session,
+      renderer,
+      content: text,
+    });
+  }
+
+  if (queuedItem) {
+    removeQueuedChip({ renderer, item: queuedItem });
+  }
 
   const live = createStreamingMessage({
     session,
     renderer,
     initialContent: "Thinking",
     fg: DIM,
+    belowBlock: queuedItem?.block,
   });
 
   let producedOutput = false;
@@ -111,6 +150,87 @@ const userInputSubmitHandler = async ({ session, renderer, textarea }: UserInput
   }
 };
 
+const processQueue = async ({ session, renderer, textarea }: UserInputHandler) => {
+  while (queuedMessages.length > 0) {
+    const next = queuedMessages.shift();
+    if (next === undefined) {
+      break;
+    }
+    await sendMessage({
+      session,
+      renderer,
+      textarea,
+      text: next.text,
+      echoUserMessage: false,
+      queuedItem: next.item,
+    });
+  }
+};
+
+const queueMessage = ({ session, renderer, textarea, text }: ComposerText) => {
+  clearComposer(textarea);
+  const item = addQueuedUserMessageToSession({ session, renderer, content: text });
+  queuedMessages.push({ text, item });
+  textarea.focus();
+  renderer.requestRender();
+};
+
+const steerMessage = ({ session, renderer, textarea, text }: ComposerText) => {
+  clearComposer(textarea);
+  sessionMessages.push({ role: "user", content: text });
+  addUserMessageToSession({ session, renderer, content: text });
+  textarea.focus();
+  renderer.requestRender();
+};
+
+const userInputSubmitHandler = async ({ session, renderer, textarea }: UserInputHandler) => {
+  const input = readComposer(textarea);
+
+  if (input.kind === "empty") {
+    textarea.focus();
+    return;
+  }
+  if (input.kind === "exit") {
+    shutdown(renderer);
+    return;
+  }
+  const text = input.text;
+  if (busy) {
+    steerMessage({ session, renderer, textarea, text });
+    return;
+  }
+
+  clearComposer(textarea);
+  renderer.requestRender();
+
+  busy = true;
+  try {
+    await sendMessage({ session, renderer, textarea, text, echoUserMessage: true });
+    await processQueue({ session, renderer, textarea });
+  } finally {
+    busy = false;
+    textarea.focus();
+  }
+};
+
+const userInputQueueHandler = ({ session, renderer, textarea }: UserInputHandler) => {
+  const input = readComposer(textarea);
+
+  if (input.kind === "empty") {
+    return;
+  }
+  if (input.kind === "exit") {
+    shutdown(renderer);
+    return;
+  }
+  if (!busy) {
+    void userInputSubmitHandler({ session, renderer, textarea });
+    return;
+  }
+
+  queueMessage({ session, renderer, textarea, text: input.text });
+};
+
 export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRenderer) => {
   const inputBox = new BoxRenderable(renderer, {
     flexShrink: 0,
@@ -148,8 +268,32 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
       void userInputSubmitHandler({ session, renderer, textarea });
     },
   });
+
   textarea.on("line-info-change", () => scheduleComposerHeight(textarea));
   inputBox.add(textarea);
+
+  renderer.keyInput.on("keypress", (key) => {
+    if (textarea.isDestroyed || !textarea.focused) {
+      return;
+    }
+    if (key.name === "tab" && !key.ctrl && !key.meta) {
+      userInputQueueHandler({ session, renderer, textarea });
+      return;
+    }
+    const isCtrlEnter = (key.name === "return" || key.name === "kpenter") && key.ctrl && !key.meta;
+    if (isCtrlEnter && busy) {
+      const input = readComposer(textarea);
+      if (input.kind === "empty") {
+        return;
+      }
+      if (input.kind === "exit") {
+        shutdown(renderer);
+        return;
+      }
+      key.preventDefault();
+      steerMessage({ session, renderer, textarea, text: input.text });
+    }
+  });
 
   return { inputBox, textarea };
 };

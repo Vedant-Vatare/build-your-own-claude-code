@@ -8,7 +8,7 @@ import {
 } from "@opentui/core";
 
 import type { ToolActivityState } from "../../types";
-import { ACCENT, BASE_TEXT, DIM, ERROR, GREEN, WHITE } from "../constants";
+import { ACCENT, BASE_TEXT, BLACK, DIM, ERROR, GREEN, WHITE } from "../constants";
 import { describeToolCall } from "../utils/tools.utils";
 import { paragraphTextRenderer } from "../utils/tui.utils";
 
@@ -55,6 +55,7 @@ type StreamingMessageArgs = {
   renderer: CliRenderer;
   initialContent?: string;
   fg?: string | RGBA;
+  belowBlock?: BoxRenderable;
 };
 
 export type ToolRow = {
@@ -86,6 +87,7 @@ export const createStreamingMessage = ({
   renderer,
   initialContent = "thinking...",
   fg = DIM,
+  belowBlock,
 }: StreamingMessageArgs): StreamingMessage => {
   const wrapper = new BoxRenderable(renderer, {
     width: "100%",
@@ -95,7 +97,13 @@ export const createStreamingMessage = ({
     paddingLeft: 1,
     paddingRight: 1,
   });
-  session.add(wrapper);
+  if (belowBlock) {
+    const siblings = session.getChildren();
+    const blockIndex = siblings.indexOf(belowBlock);
+    session.add(wrapper, blockIndex === -1 ? undefined : blockIndex + 1);
+  } else {
+    session.add(wrapper);
+  }
 
   let currentText: { node: TextRenderable; fg: string | RGBA; empty: boolean } | null = null;
 
@@ -222,19 +230,65 @@ export const createStreamingMessage = ({
   };
 };
 
-type UserMessageArgs = {
-  session: ScrollBoxRenderable;
-  renderer: CliRenderer;
-  content: string;
-  fg?: string | RGBA;
-};
-
 export const addUserMessageToSession = ({
   session,
   renderer,
   content,
   fg = BASE_TEXT,
-}: UserMessageArgs) => {
+}: SessionMessageArgs) => {
+  session.add(userMessageRow(renderer, content, fg));
+  renderer.requestRender();
+};
+
+export type QueuedItem = {
+  block: BoxRenderable;
+  chip: BoxRenderable;
+};
+
+export const addQueuedUserMessageToSession = ({
+  session,
+  renderer,
+  content,
+}: Omit<SessionMessageArgs, "fg">): QueuedItem => {
+  const block = new BoxRenderable(renderer, {
+    flexDirection: "column",
+    width: "100%",
+    flexShrink: 0,
+  });
+  const chipRow = new BoxRenderable(renderer, {
+    flexDirection: "row",
+    flexShrink: 0,
+    paddingTop: 1,
+    paddingBottom: 1,
+  });
+  chipRow.add(
+    new TextRenderable(renderer, {
+      content: " QUEUED ",
+      fg: BLACK,
+      bg: ACCENT,
+      attributes: TextAttributes.BOLD,
+      flexShrink: 0,
+    }),
+  );
+  block.add(chipRow);
+  block.add(userMessageRow(renderer, content, BASE_TEXT));
+  session.add(block);
+  renderer.requestRender();
+  return { block, chip: chipRow };
+};
+
+export const removeQueuedChip = ({
+  renderer,
+  item,
+}: {
+  renderer: CliRenderer;
+  item: QueuedItem;
+}): void => {
+  item.block.remove(item.chip);
+  renderer.requestRender();
+};
+
+const userMessageRow = (renderer: CliRenderer, content: string, fg: string | RGBA) => {
   const wrapper = new BoxRenderable(renderer, {
     flexDirection: "row",
     width: "100%",
@@ -260,6 +314,5 @@ export const addUserMessageToSession = ({
     }),
   );
   wrapper.add(body);
-  session.add(wrapper);
-  renderer.requestRender();
+  return wrapper;
 };

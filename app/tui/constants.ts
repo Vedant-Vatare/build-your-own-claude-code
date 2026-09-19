@@ -2,6 +2,7 @@ import { RGBA } from "@opentui/core";
 
 export const ACCENT = "#8661C1";
 export const WHITE = "#FFFFFF";
+export const BLACK = "#000000";
 export const BASE_TEXT = RGBA.defaultForeground();
 export const DIM = "brightBlack";
 export const ERROR = "#FF7B72";
