@@ -2,6 +2,7 @@ import { BoxRenderable, createCliRenderer } from "@opentui/core";
 import { createHeader } from "./layout/header";
 import { createSession } from "./layout/session";
 import { createUserInput } from "./layout/userInput";
+import { createWorkingStatus } from "./layout/workingStatus";
 import { getInitialModelInfo, getShellInfo } from "./utils/tui.utils";
 
 export const startTui = async () => {
@@ -20,11 +21,12 @@ export const startTui = async () => {
 
   const session = createSession(renderer);
 
-  const { inputBox, textarea } = createUserInput(session, renderer);
+  const working = createWorkingStatus(renderer);
+  const { composer, textarea } = createUserInput(session, renderer, working);
 
   root.add(header);
   root.add(session);
-  root.add(inputBox);
+  root.add(composer);
   renderer.root.add(root);
   textarea.focus();
 };

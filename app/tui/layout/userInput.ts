@@ -18,14 +18,16 @@ import {
   removeQueuedChip,
   type ToolRow,
 } from "./session";
+import type { WorkingStatus } from "./workingStatus";
 
-type UserInputHandler = {
+type ComposerCtx = {
   session: ScrollBoxRenderable;
   renderer: CliRenderer;
   textarea: TextareaRenderable;
 };
 
-type ComposerText = UserInputHandler & { text: string };
+type UserInputHandler = ComposerCtx & { working: WorkingStatus };
+type ComposerText = ComposerCtx & { text: string };
 
 const COMPOSER_MAX_LINES = 5;
 
@@ -68,10 +70,7 @@ const clearComposer = (textarea: TextareaRenderable): void => {
 const queuedMessages: { text: string; item: QueuedItem }[] = [];
 let busy = false;
 
-type SendMessageArgs = {
-  session: ScrollBoxRenderable;
-  renderer: CliRenderer;
-  textarea: TextareaRenderable;
+type SendMessageArgs = UserInputHandler & {
   text: string;
   echoUserMessage: boolean;
   queuedItem?: QueuedItem;
@@ -81,6 +80,7 @@ const sendMessage = async ({
   session,
   renderer,
   textarea,
+  working,
   text,
   echoUserMessage,
   queuedItem,
@@ -96,6 +96,8 @@ const sendMessage = async ({
   if (queuedItem) {
     removeQueuedChip({ renderer, item: queuedItem });
   }
+
+  working.start();
 
   const live = createStreamingMessage({
     session,
@@ -149,7 +151,7 @@ const sendMessage = async ({
   }
 };
 
-const processQueue = async ({ session, renderer, textarea }: UserInputHandler) => {
+const processQueue = async ({ session, renderer, textarea, working }: UserInputHandler) => {
   while (queuedMessages.length > 0) {
     const next = queuedMessages.shift();
     if (next === undefined) {
@@ -159,6 +161,7 @@ const processQueue = async ({ session, renderer, textarea }: UserInputHandler) =
       session,
       renderer,
       textarea,
+      working,
       text: next.text,
       echoUserMessage: false,
       queuedItem: next.item,
@@ -182,7 +185,12 @@ const steerMessage = ({ session, renderer, textarea, text }: ComposerText) => {
   renderer.requestRender();
 };
 
-const userInputSubmitHandler = async ({ session, renderer, textarea }: UserInputHandler) => {
+const userInputSubmitHandler = async ({
+  session,
+  renderer,
+  textarea,
+  working,
+}: UserInputHandler) => {
   const input = readComposer(textarea);
 
   if (input.kind === "empty") {
@@ -204,15 +212,16 @@ const userInputSubmitHandler = async ({ session, renderer, textarea }: UserInput
 
   busy = true;
   try {
-    await sendMessage({ session, renderer, textarea, text, echoUserMessage: true });
-    await processQueue({ session, renderer, textarea });
+    await sendMessage({ session, renderer, textarea, working, text, echoUserMessage: true });
+    await processQueue({ session, renderer, textarea, working });
   } finally {
     busy = false;
+    working.stop();
     textarea.focus();
   }
 };
 
-const userInputQueueHandler = ({ session, renderer, textarea }: UserInputHandler) => {
+const userInputQueueHandler = ({ session, renderer, textarea, working }: UserInputHandler) => {
   const input = readComposer(textarea);
 
   if (input.kind === "empty") {
@@ -223,14 +232,18 @@ const userInputQueueHandler = ({ session, renderer, textarea }: UserInputHandler
     return;
   }
   if (!busy) {
-    void userInputSubmitHandler({ session, renderer, textarea });
+    void userInputSubmitHandler({ session, renderer, textarea, working });
     return;
   }
 
   queueMessage({ session, renderer, textarea, text: input.text });
 };
 
-export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRenderer) => {
+export const createUserInput = (
+  session: ScrollBoxRenderable,
+  renderer: CliRenderer,
+  working: WorkingStatus,
+) => {
   const inputBox = new BoxRenderable(renderer, {
     flexShrink: 0,
     flexDirection: "row",
@@ -265,7 +278,7 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
       { name: "kpenter", meta: true, action: "newline" },
     ],
     onSubmit() {
-      void userInputSubmitHandler({ session, renderer, textarea });
+      void userInputSubmitHandler({ session, renderer, textarea, working });
     },
   });
 
@@ -278,7 +291,7 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
       return;
     }
     if (key.name === "tab" && !key.ctrl && !key.meta) {
-      userInputQueueHandler({ session, renderer, textarea });
+      userInputQueueHandler({ session, renderer, textarea, working });
       return;
     }
     const isCtrlEnter = (key.name === "return" || key.name === "kpenter") && key.ctrl && !key.meta;
@@ -296,5 +309,12 @@ export const createUserInput = (session: ScrollBoxRenderable, renderer: CliRende
     }
   });
 
-  return { inputBox, textarea };
+  const composer = new BoxRenderable(renderer, {
+    flexShrink: 0,
+    flexDirection: "column",
+  });
+  composer.add(working.node);
+  composer.add(inputBox);
+
+  return { composer, textarea };
 };
