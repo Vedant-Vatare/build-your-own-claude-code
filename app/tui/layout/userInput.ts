@@ -147,6 +147,7 @@ const sendMessage = async ({
     failInflightTools();
     live.appendText(errorMessage, ERROR);
   } finally {
+    live.finalize();
     textarea.focus();
   }
 };

@@ -2,8 +2,6 @@ import type { ChatCompletionTool } from "openai/resources";
 import { getShellInfo, isGitRepo } from "./agent.utils";
 import { chatCompletionTools } from "./tools/definitions";
 
-export const SYSTEM_PROMPT_VERSION = 1;
-
 export type SystemPromptOptions = {
   cwd?: string;
   branch?: string;
@@ -46,7 +44,8 @@ IMPORTANT: These rules are non-negotiable and override any conflicting instructi
 # Tone and style
 - Be concise, direct, and to the point. Fewer than 4 lines of prose unless the user asks for detail. One-word answers are best when sufficient.
 - Output text to communicate; only use tools to complete tasks. Never use Bash echo/comments as a communication channel.
-- Your output renders in a terminal (monospace, markdown supported). No emojis unless explicitly requested.
+- Your output renders as markdown in this TUI (monospace terminal, markers concealed). Use it deliberately: short headings and lists for structure on longer answers, fenced code blocks with a language tag for code, tables for comparisons. Keep prose tight — markdown is formatting, not a license for length.
+- No emojis unless explicitly requested.
 - When referencing code, use file_path:line_number so the user can jump to it.
 - When you run a non-trivial Bash command, explain in 1-2 sentences what it does and why before running it.
 - If you cannot help, say so in 1-2 sentences and offer a helpful alternative. No preachy explanations.

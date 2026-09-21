@@ -9,6 +9,7 @@ import {
 
 import type { ToolActivityState } from "../../types";
 import { ACCENT, BASE_TEXT, BLACK, DIM, ERROR, GREEN, WHITE } from "../constants";
+import { createMarkdownBlock, type MarkdownBlock, scheduleMarkdownRepaint } from "../markdown";
 import { describeToolCall } from "../utils/tools.utils";
 import { paragraphTextRenderer } from "../utils/tui.utils";
 
@@ -40,14 +41,10 @@ export const addMessageToSession = ({ session, renderer, content, fg }: SessionM
     paddingLeft: 1,
     paddingRight: 1,
   });
-  wrapper.add(
-    paragraphTextRenderer(renderer, {
-      content,
-      ...(fg ? { fg } : {}),
-    }),
-  );
+  wrapper.add(createMarkdownBlock(renderer, { content, ...(fg ? { fg } : {}) }));
   session.add(wrapper);
   renderer.requestRender();
+  scheduleMarkdownRepaint(renderer);
 };
 
 type StreamingMessageArgs = {
@@ -65,6 +62,7 @@ export type ToolRow = {
 export type StreamingMessage = {
   appendText: (delta: string, fg?: string | RGBA) => void;
   addToolRow: (name: string, args: string) => ToolRow;
+  finalize: () => void;
 };
 
 const TOOL_DOT = "•";
@@ -105,31 +103,27 @@ export const createStreamingMessage = ({
     session.add(wrapper);
   }
 
-  let currentText: { node: TextRenderable; fg: string | RGBA; empty: boolean } | null = null;
+  let currentText: { node: MarkdownBlock; fg: string | RGBA; empty: boolean } | null = null;
 
-  const openTextBlock = (blockFg: string | RGBA): TextRenderable => {
-    const node = paragraphTextRenderer(renderer, { fg: blockFg });
+  const openTextBlock = (blockFg: string | RGBA): MarkdownBlock => {
+    const node = createMarkdownBlock(renderer, { fg: blockFg, streaming: true });
     wrapper.add(node);
     return node;
   };
 
   if (initialContent) {
-    wrapper.add(
-      paragraphTextRenderer(renderer, {
-        content: initialContent,
-        fg,
-      }),
-    );
+    wrapper.add(createMarkdownBlock(renderer, { content: initialContent, fg }));
   }
   renderer.requestRender();
 
   const sealTextBlock = (): void => {
     if (!currentText) return;
-    const full = currentText.node.plainText;
+    const full = currentText.node.content;
     const trimmed = full.replace(/\s+$/, "");
     if (trimmed.length !== full.length) {
       currentText.node.content = trimmed;
     }
+    currentText.node.streaming = false;
     currentText = null;
   };
 
@@ -143,7 +137,7 @@ export const createStreamingMessage = ({
       if (delta.trim() === "") return;
       currentText.empty = false;
     }
-    currentText.node.add(delta);
+    currentText.node.content += delta;
     renderer.requestRender();
   };
 
@@ -210,7 +204,8 @@ export const createStreamingMessage = ({
         paintDot(ERROR);
         if (error) {
           const errorBlock = openTextBlock(BASE_TEXT);
-          errorBlock.add(error);
+          errorBlock.content += error;
+          errorBlock.streaming = false;
           currentText = null;
           renderer.requestRender();
         }
@@ -227,6 +222,10 @@ export const createStreamingMessage = ({
   return {
     appendText,
     addToolRow,
+    finalize: () => {
+      sealTextBlock();
+      scheduleMarkdownRepaint(renderer);
+    },
   };
 };
 
