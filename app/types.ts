@@ -1,9 +1,18 @@
 import type { ChatCompletionMessageToolCall } from "openai/resources";
 
+export type ApprovalRequest = {
+  tool: string;
+  matchText: string;
+  pattern?: string;
+};
+
+export type ApprovalDecision = "once" | "always" | "deny";
+
 export type AgentParams = {
   prompt: string;
   onTextStream?: (delta: string, fullContent: string) => void;
   onToolUse?: (event: ToolActivityEvent) => void;
+  onPermissionRequest?: (req: ApprovalRequest) => Promise<ApprovalDecision>;
 };
 
 export type ReadToolArgs = {
@@ -39,7 +48,13 @@ export type ToolCallResult = {
   content: string;
 };
 
-export type ToolActivityState = "queued" | "running" | "succeeded" | "failed";
+export type ToolActivityState =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "awaiting-approval"
+  | "denied";
 
 export type ToolActivityEvent = {
   id: string;

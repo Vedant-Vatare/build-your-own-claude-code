@@ -3,10 +3,16 @@ import type { ChatCompletionMessageToolCall } from "openai/resources";
 import { sessionMessages } from "./store";
 import { buildSystemPrompt } from "./systemPrompt";
 import { chatCompletionTools } from "./tools/definitions";
-import { executeToolCall } from "./tools/executions";
+import { executeToolCall, isDenialResult, type PermissionGate } from "./tools/executions";
+import { resolveScopeDir } from "./tools/permissionScope";
 import type { AgentParams, ToolActivityEvent } from "./types";
 
-export const agent = async ({ prompt, onTextStream, onToolUse }: AgentParams) => {
+export const agent = async ({
+  prompt,
+  onTextStream,
+  onToolUse,
+  onPermissionRequest,
+}: AgentParams) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   const model = process.env.MODEL;
   const baseURL = process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1";
@@ -107,6 +113,20 @@ export const agent = async ({ prompt, onTextStream, onToolUse }: AgentParams) =>
       });
     };
 
+    const gate: PermissionGate = {
+      scopeDir: resolveScopeDir(process.cwd()),
+      requestApproval: (req) => onPermissionRequest?.(req) ?? Promise.resolve("deny" as const),
+      onAskStarted: (id) => {
+        const slot = toolCalls.find((call) => call.id === id);
+        if (slot) updateToolActivity(slot, "awaiting-approval");
+      },
+      onAskResolved: (id, decision) => {
+        const slot = toolCalls.find((call) => call.id === id);
+        if (!slot) return;
+        updateToolActivity(slot, decision === "deny" ? "denied" : "running");
+      },
+    };
+
     for (const toolCall of toolCalls) {
       updateToolActivity(toolCall, "queued");
     }
@@ -115,8 +135,8 @@ export const agent = async ({ prompt, onTextStream, onToolUse }: AgentParams) =>
       toolCalls.map(async (toolcall: ChatCompletionMessageToolCall) => {
         updateToolActivity(toolcall, "running");
         try {
-          const result = await executeToolCall(toolcall);
-          updateToolActivity(toolcall, "succeeded");
+          const result = await executeToolCall(toolcall, gate);
+          updateToolActivity(toolcall, isDenialResult(result) ? "denied" : "succeeded");
           return result;
         } catch (error) {
           updateToolActivity(
