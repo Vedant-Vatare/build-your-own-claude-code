@@ -7,7 +7,8 @@ import {
 } from "@opentui/core";
 import { agent } from "../../agent";
 import { sessionMessages } from "../../store";
-import type { ToolActivityEvent } from "../../types";
+import type { ApprovalDecision, ApprovalRequest, ToolActivityEvent } from "../../types";
+import { installApprovalKeys, requestApproval } from "../approval";
 import { ACCENT, BASE_TEXT, DIM, ERROR } from "../constants";
 import { composerRows, shutdown } from "../utils/tui.utils";
 import {
@@ -24,10 +25,11 @@ type ComposerCtx = {
   session: ScrollBoxRenderable;
   renderer: CliRenderer;
   textarea: TextareaRenderable;
+  approvalSlot: BoxRenderable;
 };
 
 type UserInputHandler = ComposerCtx & { working: WorkingStatus };
-type ComposerText = ComposerCtx & { text: string };
+type ComposerText = Pick<ComposerCtx, "session" | "renderer" | "textarea"> & { text: string };
 
 const COMPOSER_MAX_LINES = 5;
 
@@ -80,6 +82,7 @@ const sendMessage = async ({
   session,
   renderer,
   textarea,
+  approvalSlot,
   working,
   text,
   echoUserMessage,
@@ -110,6 +113,9 @@ const sendMessage = async ({
   let producedOutput = false;
   const toolRows = new Map<string, ToolRow>();
 
+  const onPermissionRequest = (req: ApprovalRequest): Promise<ApprovalDecision> =>
+    requestApproval({ slot: approvalSlot, renderer, ...req });
+
   const failInflightTools = (): void => {
     for (const row of toolRows.values()) {
       row.setToolState("failed");
@@ -136,7 +142,12 @@ const sendMessage = async ({
       toolRow.setToolState(event.state, event.error);
     };
 
-    const agentResponse = await agent({ prompt: text, onTextStream, onToolUse });
+    const agentResponse = await agent({
+      prompt: text,
+      onTextStream,
+      onToolUse,
+      onPermissionRequest,
+    });
 
     toolRows.clear();
     if (!agentResponse && !producedOutput) {
@@ -152,7 +163,13 @@ const sendMessage = async ({
   }
 };
 
-const processQueue = async ({ session, renderer, textarea, working }: UserInputHandler) => {
+const processQueue = async ({
+  session,
+  renderer,
+  textarea,
+  working,
+  approvalSlot,
+}: UserInputHandler) => {
   while (queuedMessages.length > 0) {
     const next = queuedMessages.shift();
     if (next === undefined) {
@@ -163,6 +180,7 @@ const processQueue = async ({ session, renderer, textarea, working }: UserInputH
       renderer,
       textarea,
       working,
+      approvalSlot,
       text: next.text,
       echoUserMessage: false,
       queuedItem: next.item,
@@ -191,6 +209,7 @@ const userInputSubmitHandler = async ({
   renderer,
   textarea,
   working,
+  approvalSlot,
 }: UserInputHandler) => {
   const input = readComposer(textarea);
 
@@ -213,8 +232,16 @@ const userInputSubmitHandler = async ({
 
   busy = true;
   try {
-    await sendMessage({ session, renderer, textarea, working, text, echoUserMessage: true });
-    await processQueue({ session, renderer, textarea, working });
+    await sendMessage({
+      session,
+      renderer,
+      textarea,
+      working,
+      approvalSlot,
+      text,
+      echoUserMessage: true,
+    });
+    await processQueue({ session, renderer, textarea, working, approvalSlot });
   } finally {
     busy = false;
     working.stop();
@@ -222,7 +249,13 @@ const userInputSubmitHandler = async ({
   }
 };
 
-const userInputQueueHandler = ({ session, renderer, textarea, working }: UserInputHandler) => {
+const userInputQueueHandler = ({
+  session,
+  renderer,
+  textarea,
+  working,
+  approvalSlot,
+}: UserInputHandler) => {
   const input = readComposer(textarea);
 
   if (input.kind === "empty") {
@@ -233,7 +266,7 @@ const userInputQueueHandler = ({ session, renderer, textarea, working }: UserInp
     return;
   }
   if (!busy) {
-    void userInputSubmitHandler({ session, renderer, textarea, working });
+    void userInputSubmitHandler({ session, renderer, textarea, working, approvalSlot });
     return;
   }
 
@@ -245,6 +278,13 @@ export const createUserInput = (
   renderer: CliRenderer,
   working: WorkingStatus,
 ) => {
+  installApprovalKeys(renderer);
+  const approvalSlot = new BoxRenderable(renderer, {
+    flexShrink: 0,
+    flexDirection: "column",
+    marginLeft: 1,
+    marginRight: 1,
+  });
   const inputBox = new BoxRenderable(renderer, {
     flexShrink: 0,
     flexDirection: "row",
@@ -279,7 +319,7 @@ export const createUserInput = (
       { name: "kpenter", meta: true, action: "newline" },
     ],
     onSubmit() {
-      void userInputSubmitHandler({ session, renderer, textarea, working });
+      void userInputSubmitHandler({ session, renderer, textarea, working, approvalSlot });
     },
   });
 
@@ -292,7 +332,7 @@ export const createUserInput = (
       return;
     }
     if (key.name === "tab" && !key.ctrl && !key.meta) {
-      userInputQueueHandler({ session, renderer, textarea, working });
+      userInputQueueHandler({ session, renderer, textarea, working, approvalSlot });
       return;
     }
     const isCtrlEnter = (key.name === "return" || key.name === "kpenter") && key.ctrl && !key.meta;
@@ -315,7 +355,8 @@ export const createUserInput = (
     flexDirection: "column",
   });
   composer.add(working.node);
+  composer.add(approvalSlot);
   composer.add(inputBox);
 
-  return { composer, textarea };
+  return { composer, textarea, approvalSlot };
 };

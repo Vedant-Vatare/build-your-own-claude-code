@@ -209,8 +209,10 @@ export const createStreamingMessage = ({
           currentText = null;
           renderer.requestRender();
         }
-      } else if (state === "running") {
+      } else if (state === "running" || state === "awaiting-approval") {
         startPulse();
+      } else if (state === "denied") {
+        paintDot(ERROR);
       } else {
         paintDot(DIM);
       }
