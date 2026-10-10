@@ -11,7 +11,8 @@ export const readFileTool: ChatCompletionTool = {
       properties: {
         file_path: {
           type: "string",
-          description: "Absolute path to the file to read. Prefer absolute paths; relative paths resolve from the working directory.",
+          description:
+            "Path to the file to read, relative to the working directory (repo root), e.g. src/index.ts.",
         },
       },
       required: ["file_path"],
@@ -31,7 +32,8 @@ export const WriteFileTool: ChatCompletionTool = {
       properties: {
         file_path: {
           type: "string",
-          description: "Absolute path of the file to write to",
+          description:
+            "Path of the file to write to, relative to the working directory (repo root), e.g. src/new.ts.",
         },
         content: {
           type: "string",
@@ -59,7 +61,8 @@ export const EditFileTool: ChatCompletionTool = {
             properties: {
               file_path: {
                 type: "string",
-                description: "Path to the file.",
+                description:
+                  "Path to the file, relative to the working directory (repo root), e.g. src/index.ts.",
               },
               old_string: {
                 type: "string",
