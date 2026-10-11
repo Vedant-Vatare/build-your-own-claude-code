@@ -1,5 +1,6 @@
 import type { ChatCompletionTool } from "openai/resources";
 import { getShellInfo, isGitRepo } from "./agent.utils";
+import { formatSkillsForPrompt, getAvailableSkills } from "./skills";
 import { chatCompletionTools } from "./tools/definitions";
 
 export type SystemPromptOptions = {
@@ -30,6 +31,11 @@ const toolInventory = (tools: ChatCompletionTool[]): string => {
     )
     .map((tool) => `- ${tool.function.name}: ${tool.function.description ?? ""}`);
   return lines.join("\n");
+};
+
+const skillInventory = (cwd: string): string => {
+  const allSkills = getAvailableSkills(cwd);
+  return formatSkillsForPrompt(allSkills);
 };
 
 const STATIC_PROMPT = `You are Syntax, a precise, safe, and helpful TUI coding agent. You help users with software engineering tasks by reading code, running commands, and making minimal verified edits.
@@ -130,7 +136,10 @@ In addition to the tools above, tool results may carry session hints — use the
 # Domain knowledge — load on demand
 - Project instructions (AGENTS.md / CLAUDE.md) are the map, not the territory. When present, obey nested files over parent files for files in their scope; direct user instructions beat file instructions.
 - Do not bulk-load whole codebases upfront. Retrieve just-in-time via Glob/Read. The cheapest token is the one never read.
-- Skills or docs referenced by path are loaded lazily when the task actually needs them.
+- Available skills and their SKILL.md paths are listed below so you can identify relevant skills.
+
+# Available skills
+{{SKILL_INVENTORY}}
 
 # Reminders
 IMPORTANT: Re-assert on every turn — safety first, minimal diffs, verify with real tool output, never commit or expose secrets, never invent APIs/paths/URLs.
@@ -149,7 +158,10 @@ On Windows use pwsh syntax; on posix use sh syntax.
 export const buildSystemPrompt = (overrides: SystemPromptOptions = {}): string => {
   const ctx = { ...getDefaultContext(), ...overrides };
   const tools = toolInventory(chatCompletionTools);
-  const staticPart = STATIC_PROMPT.replace("{{TOOL_INVENTORY}}", tools);
+  const staticPart = STATIC_PROMPT.replace("{{TOOL_INVENTORY}}", tools).replace(
+    "{{SKILL_INVENTORY}}",
+    skillInventory(ctx.cwd),
+  );
   const env = ENV_TEMPLATE.replace("{{CWD}}", ctx.cwd ?? process.cwd())
     .replace("{{GIT}}", ctx.isGitRepo ? "yes" : "no")
     .replace("{{BRANCH}}", ctx.branch || "(none)")
