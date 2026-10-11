@@ -1,11 +1,23 @@
 import { type CliRenderer, type TextOptions, TextRenderable } from "@opentui/core";
 import { getShellInfo as getSharedShellInfo } from "../../agent.utils";
+import { debug } from "../../debug";
 
 let shuttingDown = false;
 export const shutdown = (renderer: CliRenderer) => {
   if (shuttingDown) return;
   shuttingDown = true;
   renderer.destroy();
+};
+
+export const setupTerminalConfig = (renderer: CliRenderer) => {
+  renderer.setTerminalTitle("Syntax");
+  renderer.on("selection", (selection) => {
+    const selectedText = selection.getSelectedText();
+    if (selectedText.trim()) {
+      const copied = renderer.copyToClipboardOSC52(selectedText);
+      if (!copied) debug("clipboard copy (OSC 52) failed for selection");
+    }
+  });
 };
 
 export const getInitialModelInfo = () => {
