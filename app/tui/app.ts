@@ -1,4 +1,5 @@
 import { BoxRenderable, createCliRenderer } from "@opentui/core";
+import { debug } from "../debug";
 import { createHeader } from "./layout/header";
 import { createSession } from "./layout/session";
 import { createUserInput } from "./layout/userInput";
@@ -7,6 +8,13 @@ import { getInitialModelInfo, getShellInfo } from "./utils/tui.utils";
 
 export const startTui = async () => {
   const renderer = await createCliRenderer({ exitOnCtrlC: false });
+  renderer.on("selection", (selection) => {
+    const selectedText = selection.getSelectedText();
+    if (selectedText.trim()) {
+      const copied = renderer.copyToClipboardOSC52(selectedText);
+      if (!copied) debug("clipboard copy (OSC 52) failed for selection");
+    }
+  });
 
   const { model, effort } = getInitialModelInfo();
   const { cwd, branch } = getShellInfo();
